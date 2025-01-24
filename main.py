@@ -8,8 +8,6 @@ from pprint import pprint
 player_data = pd.read_csv('player_data.csv')
 hole_data = pd.read_csv('Hole_1.csv')
 
-arrays = hole_data.loc[hole_data['Area'] == 'TreeLine', 'Coordinates'].values
-tree_lines = []
 
 
 def parse_hole_data(dataframe):
@@ -61,20 +59,27 @@ def return_location(location, hole_data):
     return is_inside
 
 
-hole_data = create_polygon(hole_data)
-#pprint(hole_data)
-coordinate = (51.60302816132606, -0.2192137342043472)
-point = Point(coordinate)
-return_location(point, hole_data)
-print(hole_data['Fairway'][0])
-test = list(hole_data.keys())
-print(len(hole_data['TreeLine']))
-print(test[0])
+#hole_data = create_polygon(hole_data)
+#coordinate = (51.60302816132606, -0.2192137342043472)
+#point = Point(coordinate)
+
+boolean_location = return_location(Point(51.604104455716836, -0.21924877440459767), create_polygon(hole_data))
+pprint(boolean_location)
+
+#DEBUGGING
+
+#arrays = hole_data.loc[hole_data['Area'] == 'TreeLine', 'Coordinates'].values
+
+#This prints all the Polygons for all the zones
+#pprint(create_polygon(hole_data))
+
+#This prints the starting entries of the Player_Data
+#print(player_data.head())
+
+#This prints a specific players Driver Distance
+#print(player_data.loc[player_data['ID'] == 230, 'Driver'].values[0])
 
 
-print(player_data.head())
-
-print(player_data.loc[player_data['ID'] == 230, 'Driver'].values[0])
-
+#Functions to work on.
 def calculate_shot_with_dispersion(player, start_coords, remaining_distance):
     pass
