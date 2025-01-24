@@ -1,6 +1,6 @@
 import pandas as pd
 from geopy.distance import geodesic
-from shapely.geometry import Polygon
+from shapely.geometry import Point, Polygon
 import ast
 from pprint import pprint
 
@@ -41,14 +41,31 @@ def create_polygon(dataframe):
 
 def return_location(location, hole_data):
     predefined_areas = ['Fairway', 'TreeLine', 'Green', 'Bunker', 'Zone', 'TeeBox']
+    is_inside = {}
 
-    
     for zone, polygons in hole_data.items():
+        if zone in predefined_areas:
+            is_inside[zone] = False
+
             for i, polygon in enumerate(polygons):
-                pass
+                if isinstance(polygon, str):
+                    hole_data[zone][i] = Polygon(ast.literal_eval(polygon))
+                    polygon = hole_data[zone][i]
+
+                if polygon.contains(location):
+                    is_inside[zone] = True
+                    break
+
+    #print('Result:')
+    #pprint(is_inside)
+    return is_inside
 
 
 hole_data = create_polygon(hole_data)
+#pprint(hole_data)
+coordinate = (51.60302816132606, -0.2192137342043472)
+point = Point(coordinate)
+return_location(point, hole_data)
 print(hole_data['Fairway'][0])
 test = list(hole_data.keys())
 print(len(hole_data['TreeLine']))
