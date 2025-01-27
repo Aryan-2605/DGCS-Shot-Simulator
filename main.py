@@ -156,5 +156,13 @@ boolean_location = return_location(Point(51.604104455716836, -0.2192487744045976
 
 
 #Functions to work on.
+
+def club_selection(coordinates, player_data, hole_data):
+    area = return_location(coordinates, hole_data)
+    green_distance = calculate_green_distances(coordinates, hole_data['Green'][0])
+    
+
+
+
 def calculate_shot_with_dispersion(player, start_coords, remaining_distance):
     pass
