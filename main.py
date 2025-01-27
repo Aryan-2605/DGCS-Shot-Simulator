@@ -157,7 +157,12 @@ boolean_location = return_location(Point(51.604104455716836, -0.2192487744045976
 
 #Functions to work on.
 
-def organize_bag(bag):
+
+
+def organize_bag(data):
+
+     bag = {key: data[key] for key in data.keys() if
+           not key.endswith('_Dispersion') and key not in ['ID', 'Age', 'Gender', 'HCP']}
 
      bag = {
         'Woods': {key: value for key, value in bag.items() if key in ['Driver', '3-Wood', '5-Wood']},
@@ -179,6 +184,63 @@ def extract_row(id, player_data):
 
     return row_dict
 
+def fairway(bag, centre):
+    club_selected = None
+    current_distance = 0
+    #print('Running function Fairway(bag, centre)')
+    for category, clubs in bag.items():
+        for item, distance in clubs.items():
+            if distance < centre and item != 'Driver':
+                if current_distance < distance:
+                    club_selected = item
+                    current_distance = distance
+    return club_selected
+
+def bunker(bag, centre):
+    club_selected = None
+    current_distance = 0
+    print(f'Running function bunker(bag, centre)')
+    for category, clubs in bag.items():
+        for item, distance in clubs.items():
+            # prioritize Wedges
+            if centre <= 100 and category == 'Wedges':
+                if distance < centre and (club_selected is None or distance > current_distance):
+                    club_selected = item
+                    current_distance = distance
+            # Long-distance bunker logic: use other appropriate clubs
+            elif centre > 100 and category == 'Irons':
+                centre += 10
+                if distance < centre and (club_selected is None or distance > current_distance):
+                    club_selected = item
+                    current_distance = distance
+    return club_selected
+
+def rough(player_hcp, bag, centre):
+    club_selected = None
+    current_distance = 0
+    print(f'Running function rough(player_hcp, bag, centre)')
+
+    if player_hcp >= 15:
+        for category, clubs in bag.items():
+            for club, club_distance in clubs.items():
+                # High HCP: Choose a safe, controlled shot with short irons or hybrids
+                if category in ['Irons', 'Hybrids'] and club_distance < centre:
+                    if club_selected is None or club_distance > current_distance:
+                        club_selected = club
+                        current_distance = club_distance
+    else:  # Low HCP players can take more aggressive shots
+        for category, clubs in bag.items():
+            for club, club_distance in clubs.items():
+                # Low HCP: Allow longer irons, hybrids, or woods for longer distances
+                if category in ['Woods', 'Hybrids', 'Irons'] and club_distance < centre:
+                    if club_selected is None or club_distance > current_distance:
+                        club_selected = club
+                        current_distance = club_distance
+
+    return club_selected
+
+
+
 #print(extract_row(1, player_data))
 def club_selection(id, coordinates, player_data, hole_data):
 
@@ -187,87 +249,44 @@ def club_selection(id, coordinates, player_data, hole_data):
     #ID = int
 
 
-
     area = return_location(coordinates, hole_data)
     print(area)
     green_distance = calculate_green_distances(coordinates, hole_data['Green'][0])
     #print(green_distance)
     centre = green_distance['Centre'][0]
-    #print(centre)
+    print(centre)
     data = extract_row(id, player_data)
     #print(data['7-Iron'])
     #print(data)
-    bag = {key: data[key] for key in data.keys() if
-             not key.endswith('_Dispersion') and key not in ['ID', 'Age', 'Gender', 'HCP']}
-    bag = organize_bag(bag)
+    bag = organize_bag(data)
     player_hcp = data['HCP']
     print(player_hcp)
-
-
     print(bag)
 
-    club_selected = None
-    current_distance = 0
     if area.get('Fairway') is True and area.get('Zone') is True and all(
         value is False for key, value in area.items() if key not in ['Fairway', 'Zone']):
-        print("You're in fairway.")
-        for category, clubs in bag.items():
-            for item, distance in clubs.items():
-                if distance < centre and item != 'Driver':
-                    if current_distance < distance:
-                        club_selected = item
-                        current_distance = distance
-        return club_selected
-
+        club = fairway(bag, centre)
+        return club
 
     if area.get('Bunker') is True:
-        for category, clubs in bag.items():  # Iterate over categories (e.g., Woods, Irons, etc.)
-            for item, distance in clubs.items():  # Iterate over individual clubs
-                # Short-distance bunker logic: prioritize Wedges
-                if centre <= 90 and category == 'Wedges':  # Bunker is close
-                    if distance < centre and (club_selected is None or distance > current_distance):
-                        club_selected = item
-                        current_distance = distance
-                # Long-distance bunker logic: use other appropriate clubs
-                elif centre > 91 and category == 'Irons':
-                    distance =+ 10
-                    if distance < centre and (club_selected is None or distance > current_distance):
-                        club_selected = item
-                        current_distance = distance
+        club = bunker(bag, centre)
+        return club
 
-        return club_selected
+    #Add Treeline before Zone
 
-    if area.get('Zone') is True:  # Ball is in the rough
+    if area.get('Zone') is True and all(value is False for key, value in area.items() if key not in ['Zone']):
         # High HCP players should play conservatively
-        if player_hcp >= 15:
-            for category, clubs in bag.items():
-                for club, club_distance in clubs.items():
-                    # High HCP: Choose a safe, controlled shot with short irons or hybrids
-                    if category in ['Irons', 'Hybrids'] and club_distance < centre:
-                        if club_selected is None or club_distance > current_distance:
-                            club_selected = club
-                            current_distance = club_distance
-        else:  # Low HCP players can take more aggressive shots
-            for category, clubs in bag.items():
-                for club, club_distance in clubs.items():
-                    # Low HCP: Allow longer irons, hybrids, or woods for longer distances
-                    if category in ['Woods', 'Hybrids', 'Irons'] and club_distance < centre:
-                        if club_selected is None or club_distance > current_distance:
-                            club_selected = club
-                            current_distance = club_distance
-
-        return club_selected
-
+        club = rough(player_hcp, bag, centre)
+        return club
 
 
 
 
     print("FINAL SELECTION")
-    print(club_selected)
 
 
 
-selected_club = club_selection(19, Point(51.60422557996411, -0.21932983010496174), player_data, test_hole)
+selected_club = club_selection(19, Point(51.60363301132541, -0.21907924242759613), player_data, test_hole)
 print(selected_club)
     
 
