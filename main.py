@@ -1,13 +1,15 @@
+import random
+
 import pandas as pd
 from geopy.distance import geodesic
 from shapely.geometry import Point, Polygon
 import ast
 from pprint import pprint
-
 from shapely.geometry.linestring import LineString
 
 player_data = pd.read_csv('player_data.csv')
 hole_data = pd.read_csv('Hole_1.csv')
+
 
 def parse_hole_data(dataframe):
     predefined_areas = ['Fairway', 'TreeLine', 'Green', 'Bunker', 'Zone', 'TeeBox']
@@ -22,6 +24,7 @@ def parse_hole_data(dataframe):
 
     return area_coordinates
 
+
 def create_polygon(dataframe):
     area_coordinates = parse_hole_data(dataframe)
     hole_data = {}
@@ -34,6 +37,7 @@ def create_polygon(dataframe):
             #print(f"  Polygon {i + 1}: {polygon}")
 
     return hole_data
+
 
 def return_location(location, hole_data):
     predefined_areas = ['Fairway', 'TreeLine', 'Green', 'Bunker', 'Zone', 'TeeBox']
@@ -56,8 +60,8 @@ def return_location(location, hole_data):
     #pprint(is_inside)
     return is_inside
 
-def calculate_green_intersections(position, green):
 
+def calculate_green_intersections(position, green):
     #+-------------- DEBUGGING --------------+
 
     #print(f'Position = {position} Green_Polygon = {green}')
@@ -87,7 +91,6 @@ def calculate_green_intersections(position, green):
 
     intersection_points = green.exterior.intersection(extended_line)
 
-
     points_list = list(intersection_points.geoms)
     #print(points_list[0])  #Front of green
     #print(points_list[1])  #back on green
@@ -101,7 +104,6 @@ def calculate_green_intersections(position, green):
 
 
 def calculate_green_distances(position, green):
-
     distances = {}
     intersections = calculate_green_intersections(position, green)
 
@@ -110,10 +112,9 @@ def calculate_green_distances(position, green):
     back = (intersections['Back'][0].y, intersections['Back'][0].x)
     centre = (intersections['Centre'][0].y, intersections['Centre'][0].x)
 
-    distance_front = round(geodesic(position, front).meters * 1.09361,1)
-    distance_centre = round(geodesic(position, centre).meters * 1.09361,1)
-    distance_back = round(geodesic(position, back).meters * 1.09361,1)
-
+    distance_front = round(geodesic(position, front).meters * 1.09361, 1)
+    distance_centre = round(geodesic(position, centre).meters * 1.09361, 1)
+    distance_back = round(geodesic(position, back).meters * 1.09361, 1)
 
     distances.setdefault("Front", []).append(distance_front)
     #print(f'Distance to front = {distance_front}')
@@ -127,6 +128,7 @@ def calculate_green_distances(position, green):
     #pprint(distances)
     return distances
 
+
 test_hole = create_polygon(hole_data)
 #Green = test_hole['Green'][0]
 #centre = Green.centroid
@@ -139,6 +141,8 @@ test_hole = create_polygon(hole_data)
 #point = Point(coordinate)
 
 boolean_location = return_location(Point(51.604104455716836, -0.21924877440459767), create_polygon(hole_data))
+
+
 #pprint(boolean_location)
 
 #DEBUGGING
@@ -158,20 +162,18 @@ boolean_location = return_location(Point(51.604104455716836, -0.2192487744045976
 #Functions to work on.
 
 
-
 def organize_bag(data):
-
-     bag = {key: data[key] for key in data.keys() if
+    bag = {key: data[key] for key in data.keys() if
            not key.endswith('_Dispersion') and key not in ['ID', 'Age', 'Gender', 'HCP']}
 
-     bag = {
+    bag = {
         'Woods': {key: value for key, value in bag.items() if key in ['Driver', '3-Wood', '5-Wood']},
         'Hybrids': {key: value for key, value in bag.items() if key.endswith('Hybrid')},
         'Irons': {key: value for key, value in bag.items() if key.endswith('Iron')},
         'Wedges': {key: value for key, value in bag.items() if key in ['PW', 'GW', 'SW', 'LW']}
     }
 
-     return bag
+    return bag
 
 
 def extract_row(id, player_data):
@@ -184,17 +186,31 @@ def extract_row(id, player_data):
 
     return row_dict
 
+
 def fairway(bag, centre):
     club_selected = None
     current_distance = 0
+    shortest_club = None
+    shortest_distance = float('inf')
     #print('Running function Fairway(bag, centre)')
+    for category, clubs in bag.items():
+        for club, club_distance in clubs.items():
+            if club_distance < shortest_distance:
+                shortest_distance = club_distance
+                shortest_club = club
+
     for category, clubs in bag.items():
         for item, distance in clubs.items():
             if distance < centre and item != 'Driver':
                 if current_distance < distance:
                     club_selected = item
                     current_distance = distance
+
+    if club_selected is None:
+        club_selected = shortest_club
+
     return club_selected
+
 
 def bunker(bag, centre):
     club_selected = None
@@ -213,13 +229,27 @@ def bunker(bag, centre):
                 if distance < centre and (club_selected is None or distance > current_distance):
                     club_selected = item
                     current_distance = distance
+            else:
+                return 'SW'
     return club_selected
+
 
 def rough(player_hcp, bag, centre):
     club_selected = None
     current_distance = 0
-    print(f'Running function rough(player_hcp, bag, centre)')
+    shortest_club = None
+    shortest_distance = float('inf')  # Start with an infinitely large number
 
+    #print(f'Running function rough(player_hcp, bag, centre)')
+    #print(f'Distance to target: {centre}')
+
+    for category, clubs in bag.items():
+        for club, club_distance in clubs.items():
+            if club_distance < shortest_distance:
+                shortest_distance = club_distance
+                shortest_club = club
+
+    # Logic for club selection
     if player_hcp >= 15:
         for category, clubs in bag.items():
             for club, club_distance in clubs.items():
@@ -232,22 +262,83 @@ def rough(player_hcp, bag, centre):
         for category, clubs in bag.items():
             for club, club_distance in clubs.items():
                 # Low HCP: Allow longer irons, hybrids, or woods for longer distances
+                #print(f'Checking club: {club} (distance: {club_distance})')
                 if category in ['Woods', 'Hybrids', 'Irons'] and club_distance < centre:
+                    #print(f'Selecting club: {club}')
                     if club_selected is None or club_distance > current_distance:
                         club_selected = club
                         current_distance = club_distance
 
+    # Fallback: Select the shortest club if no suitable club was found
+    if club_selected is None:
+        #print("No club suitable for the target distance. Using shortest club as fallback.")
+        club_selected = shortest_club
+
     return club_selected
 
+def TeeBox(player_hcp, bag, centre):
+    current_distance = 0
+    club_selected = None
+
+    for category, clubs in bag.items():
+        if category == 'Woods':
+            probabilities = {}
+            for club, club_distance in clubs.items():
+
+                if club == 'Driver':
+                    if player_hcp <= 10:
+                        probabilities[club] = 0.9
+                    elif player_hcp <= 20:
+                        probabilities[club] = 0.7
+                    else:  # High HCP: Lower chance for Driver
+                        probabilities[club] = 0.5
+                else:  # Safer clubs like 3-Wood and 5-Wood
+                    probabilities[club] = 1 - probabilities.get('Driver', 0)
+
+            print(probabilities)
+
+            # Normalize probabilities to ensure they sum to 1
+            total_weight = sum(probabilities.values())
+            normalized_probabilities = {club: prob / total_weight for club, prob in probabilities.items()}
+
+            selected_club = random.choices(
+                list(normalized_probabilities.keys()),
+                weights=normalized_probabilities.values(),
+                k=1
+            )[0]
+
+            # Track the selected club and its distance
+            if clubs[selected_club] > current_distance:
+                club_selected = selected_club
+                current_distance = clubs[selected_club]
+
+    return club_selected
+
+
+def treeline(bag, centre):
+    club_selected = None
+    current_distance = 0
+
+    # Iterate over bag for suitable clubs
+    for category, clubs in bag.items():
+        for club, club_distance in clubs.items():
+            if category in ['Hybrids', 'Irons'] and club_distance <= centre:
+                # Prefer low-lofted clubs for control
+                if club_selected is None or club_distance > current_distance:
+                    club_selected = club
+                    current_distance = club_distance
+
+    if club_selected is None:
+        club_selected = 'SW'
+
+    return club_selected
 
 
 #print(extract_row(1, player_data))
 def club_selection(id, coordinates, player_data, hole_data):
-
     #Coordinates = tuple
     #player_data = dataframe
     #ID = int
-
 
     area = return_location(coordinates, hole_data)
     print(area)
@@ -262,9 +353,13 @@ def club_selection(id, coordinates, player_data, hole_data):
     player_hcp = data['HCP']
     print(player_hcp)
     print(bag)
+    if area.get('TeeBox') is True:
+        club = TeeBox(player_hcp, bag, centre)
+        return club
+
 
     if area.get('Fairway') is True and area.get('Zone') is True and all(
-        value is False for key, value in area.items() if key not in ['Fairway', 'Zone']):
+            value is False for key, value in area.items() if key not in ['Fairway', 'Zone']):
         club = fairway(bag, centre)
         return club
 
@@ -273,6 +368,10 @@ def club_selection(id, coordinates, player_data, hole_data):
         return club
 
     #Add Treeline before Zone
+    if area.get('Zone') is True and area.get('TreeLine') is True and all(
+            value is False for key, value in area.items() if key not in ['Zone', 'TreeLine']):
+        club = treeline(bag, centre)
+        return club
 
     if area.get('Zone') is True and all(value is False for key, value in area.items() if key not in ['Zone']):
         # High HCP players should play conservatively
@@ -280,16 +379,8 @@ def club_selection(id, coordinates, player_data, hole_data):
         return club
 
 
-
-
-    print("FINAL SELECTION")
-
-
-
-selected_club = club_selection(19, Point(51.60363301132541, -0.21907924242759613), player_data, test_hole)
+selected_club = club_selection(19, Point(51.60311663745501, -0.21905859961178653), player_data, test_hole)
 print(selected_club)
-    
-
 
 
 def calculate_shot_with_dispersion(player, start_coords, remaining_distance):
