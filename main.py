@@ -111,7 +111,7 @@ class Hole:
         # Apparently the line is not long enough to cut through the green and only gives you one intersection point
         # ALSO there shouldn't be any tangent lines it's impossible since we cut through the polygon's centroid.
 
-        extension_factor = 2  # Don't mess with lines 73 - 80 unless you know what your doing because I have no clue.
+        extension_factor = 5  # Don't mess with lines 73 - 80 unless you know what your doing because I have no clue.
         extended_line = LineString([
             position,
             Point(
@@ -442,8 +442,8 @@ class GolfSimulator:
 
             if(new_area.get('Zone') is True):
                 valid = True
-                #print('Invalid Zone')
-                #print(Point(new_lon, new_lat))
+                print('Invalid Zone')
+                print(Point(new_lon, new_lat))
 
         # Print debugging info
         print(f"\nClub: {club}")
@@ -518,9 +518,12 @@ if __name__ == '__main__':
 
 
     for i in range(1,501):
+        print(f'----------------------PLAYER [ {i} ] ----------------------')
         simulator = GolfSimulator(player_data, hole_data, Point(51.60576426300037, -0.22007174187974488))
         simulator.simulateShot(i, Point(51.60576426300037, -0.22007174187974488))
         simulator.plotShot()
+        print()
+
 
     #simulator = GolfSimulator(player_data, hole_data, Point(51.60576426300037, -0.22007174187974488))
     #simulator.simulateShot(100, Point(51.60576426300037, -0.22007174187974488))
