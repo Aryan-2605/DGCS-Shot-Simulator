@@ -2,7 +2,7 @@ import random
 import math
 class AngleDispersion:
     @staticmethod
-    def truncated_gaussian(center=0.0, sigma=1.5, low=-10.0, high=10.0):
+    def truncated_gaussian(center=0.0, sigma=1.5, low=-20.0, high=20.0):
         while True:
             x = random.gauss(center, sigma)
             if low <= x <= high:
@@ -10,7 +10,6 @@ class AngleDispersion:
 
     @staticmethod
     def get_random_value_float(score, difficulty, max_score=35):
-        # Base alpha from score
         alpha = score / max_score  # 0..1
 
         if difficulty:
@@ -34,6 +33,6 @@ if __name__ == "__main__":
     avg_normal = sum(samples_normal)/N
     avg_less   = sum(samples_less)/N
 
-    print(AngleDispersion.get_random_value_float(0, False))
+    print(AngleDispersion.get_random_value_float(30, False))
     print(AngleDispersion.get_random_value_float(0, True))
 

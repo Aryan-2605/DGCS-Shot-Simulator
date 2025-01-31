@@ -1,6 +1,8 @@
 import math
 import random
+import time
 
+import folium
 import numpy as np
 import pandas as pd
 from geopy.distance import geodesic
@@ -117,10 +119,16 @@ class Hole:
                 position.y + extension_factor * (centre.y - position.y)
             )
         ])
-
         intersection_points = green.exterior.intersection(extended_line)
-
+        if intersection_points.geom_type == 'MultiPoint':
+            print('Valid')
+            print(intersection_points)
+        else:
+            print('Invalid')
+            print(intersection_points)
         points_list = list(intersection_points.geoms)
+
+
         #print(points_list[0])  #Front of green
         #print(points_list[1])  #back on green
 
@@ -187,7 +195,7 @@ class ClubSelector:
     def bunker(bag, centre):
         club_selected = None
         current_distance = 0
-        print(f'Running function bunker(bag, centre)')
+        #print(f'Running function bunker(bag, centre)')
         for category, clubs in bag.items():
             for item, distance in clubs.items():
                 # prioritize Wedges
@@ -236,10 +244,11 @@ class ClubSelector:
                     # Low HCP: Allow longer irons, hybrids, or woods for longer distances
                     #print(f'Checking club: {club} (distance: {club_distance})')
                     if category in ['Woods', 'Hybrids', 'Irons'] and club_distance < centre:
+                        if club != 'Driver':
                         #print(f'Selecting club: {club}')
-                        if club_selected is None or club_distance > current_distance:
-                            club_selected = club
-                            current_distance = club_distance
+                            if club_selected is None or club_distance > current_distance:
+                                club_selected = club
+                                current_distance = club_distance
 
         # Fallback: Select the shortest club if no suitable club was found
         if club_selected is None:
@@ -268,7 +277,7 @@ class ClubSelector:
                     else:  # Safer clubs like 3-Wood and 5-Wood
                         probabilities[club] = 1 - probabilities.get('Driver', 0)
 
-                print(probabilities)
+                #print(probabilities)
 
                 # Normalize probabilities to ensure they sum to 1
                 total_weight = sum(probabilities.values())
@@ -308,9 +317,14 @@ class ClubSelector:
 
 
 class GolfSimulator:
-    def __init__(self, player_data, hole_data):
+    def __init__(self, player_data, hole_data, starting_point):
         self.player_data = player_data
+        self.player_id = None
         self.hole_data = hole_data
+        self.starting_point = starting_point
+        self.latest_point = starting_point
+        self.clubs = []
+        self.positions = []
 
     def club_selection(self, player_id, coordinates):
         hole = Hole(self.hole_data)
@@ -357,6 +371,7 @@ class GolfSimulator:
         """
 
         # Select a club based on the player's location
+
         club = self.club_selection(player_id, coordinates)
         player = Player(player_id, self.player_data)
 
@@ -376,16 +391,24 @@ class GolfSimulator:
 
             scaling_factor = np.random.normal(loc=mean_factor, scale=0.3)
             scaling_factor = max(0.1, min(1, scaling_factor))
-            print(f'Scaling factor: {scaling_factor}')
+            #print(f'Scaling factor for bunker: {scaling_factor}')
 
             club_distance = club_distance * scaling_factor
 
-            
+        if area.get('Zone') == True and area.get('Bunker') == False:
+            mean_factor = 0.7 + (1 - 0.7) * (36 - min(player.hcp, 36)) / 36
+            scaling_factor = min(np.random.normal(loc=mean_factor, scale=0.3), 1)
+
+           # print(f'Scaling factor for rough:  {scaling_factor}')
+
+            club_distance = club_distance * scaling_factor
+
+
 
         valid = False
         while not valid:
             # Randomize shot distance with Gaussian variation (realistic)
-            actual_distance = random.gauss(club_distance, dispersion)
+            actual_distance = min(random.gauss(club_distance, dispersion), club_distance+10)
 
             # Ensure the ball doesn’t exceed the remaining distance
             green_centre = hole.polygons['Green'][0].centroid  # Aim for the green center
@@ -419,34 +442,93 @@ class GolfSimulator:
 
             if(new_area.get('Zone') is True):
                 valid = True
-            else:
-                print('Invalid Zone')
-                print(Point(new_lon, new_lat))
+                #print('Invalid Zone')
+                #print(Point(new_lon, new_lat))
 
         # Print debugging info
         print(f"\nClub: {club}")
+        self.clubs.append(club)
         print(f"Original Position: {coordinates}")
         print(f"Green Centre: {green_centre}")
         print(f"Dispersion: {dispersion}")
         print(f"Shot Distance (yards): {actual_distance}")
         print(f"Angle Dispersion (degrees): {angle_dispersion}")
         print(f"New Position: {Point(new_lon, new_lat)}\n")
+        self.latest_point = Point(new_lon, new_lat)
+        self.positions.append(Point(new_lon, new_lat))
 
         return Point(new_lon, new_lat)
 
+    def simulateShot(self, player_id, coordinates):
+        self.player_id = player_id
+        hole = Hole(self.hole_data)
+        area = hole.return_location(self.latest_point)
+        score = 0
+        while area.get('Green') is False:
+            coordinates = self.calculate_shot_with_dispersion(player_id, self.latest_point)
+            score += 1
+            area = hole.return_location(coordinates)
+            print(f'Score: {score}\n')
+
+    def plotShot(self):
+        m = folium.Map(location=[self.starting_point.x, self.starting_point.y], zoom_start=18)
+        folium.TileLayer('Esri.WorldImagery').add_to(m)
+        folium.LayerControl().add_to(m)
+        color_scheme = {
+            'Driver' : 'Red',
+            '5-Wood' : 'Blue',
+            '3-Wood' : 'Purple',
+            '3-Hybrid' : 'Orange',
+            '4-Hybrid' : 'Darkred',
+            '5-Hybrid' : 'Darkblue',
+            '4-Iron' : 'Lightred',
+            '5-Iron' : 'Beige',
+            '6-Iron' : 'Darkblue',
+            '7-Iron' : 'Lightblue',
+            '8-Iron' : 'Pink',
+            '9-Iron' : 'Cadetblue',
+            'PW' : 'Lightgray',
+            'SW' : 'Yellow',
+            'GW' : 'White',
+            'LW' : 'Lightgray'
+
+        }
+
+        current_x, current_y = self.starting_point.x, self.starting_point.y
+        print(current_x, current_y)
+        for position in self.positions:
+            x, y = position.x, position.y
+          #  print(current_x, current_y)
+           # print()
+           # print(x,y)
+            color = color_scheme[self.clubs[self.positions.index(position)]]
+            folium.PolyLine([(current_x, current_y), (x,y)], color=color, weight=4.5, opacity=0.8).add_to(m)
+            folium.Marker([current_x, current_y], color = color,
+                          popup=self.clubs[self.positions.index(position)]).add_to(m)
+            current_x, current_y = position.x, position.y
+
+        m.save(f'Dataset/Maps/{self.player_id}.html')
+
+
+if __name__ == '__main__':
+
+    player_data = pd.read_csv('player_data.csv')
+    hole_data = pd.read_csv('Hole_1.csv')
+    #print(random.gauss(304, 18))
+
+
+    for i in range(1,501):
+        simulator = GolfSimulator(player_data, hole_data, Point(51.60576426300037, -0.22007174187974488))
+        simulator.simulateShot(i, Point(51.60576426300037, -0.22007174187974488))
+        simulator.plotShot()
+
+    #simulator = GolfSimulator(player_data, hole_data, Point(51.60576426300037, -0.22007174187974488))
+    #simulator.simulateShot(100, Point(51.60576426300037, -0.22007174187974488))
+    #simulator.plotShot()
 
 
 
-
-
-
-
-player_data = pd.read_csv('player_data.csv')
-hole_data = pd.read_csv('Hole_1.csv')
-print(random.gauss(304, 18))
-
-simulator = GolfSimulator(player_data, hole_data)
-simulator.calculate_shot_with_dispersion(5, Point(51.60411884325774, -0.2200671400154587))
-selected_club = simulator.club_selection(19, Point(51.60405860120144, -0.2195491439693001))
-print(f"Selected Club: {selected_club}")
+    #simulator.calculate_shot_with_dispersion(5, Point(51.6036656607981, -0.2197817352561925))
+    #selected_club = simulator.club_selection(19, Point(51.60405860120144, -0.2195491439693001))
+    #print(f"Selected Club: {selected_club}")
 
