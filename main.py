@@ -1,4 +1,6 @@
+import csv
 import math
+import os
 import random
 import time
 
@@ -121,8 +123,9 @@ class Hole:
         ])
         intersection_points = green.exterior.intersection(extended_line)
         if intersection_points.geom_type == 'MultiPoint':
-            print('Valid')
-            print(intersection_points)
+            pass
+            #print('Valid')
+            #print(intersection_points)
         else:
             print('Invalid')
             print(intersection_points)
@@ -317,7 +320,7 @@ class ClubSelector:
 
 
 class GolfSimulator:
-    def __init__(self, player_data, hole_data, starting_point):
+    def __init__(self, player_data, hole_data, starting_point, hole_id):
         self.player_data = player_data
         self.player_id = None
         self.hole_data = hole_data
@@ -325,6 +328,9 @@ class GolfSimulator:
         self.latest_point = starting_point
         self.clubs = []
         self.positions = []
+        self.hole_id = hole_id
+        self.score = 0
+        self.csv_initialized = False
 
     def club_selection(self, player_id, coordinates):
         hole = Hole(self.hole_data)
@@ -408,6 +414,7 @@ class GolfSimulator:
         valid = False
         while not valid:
             # Randomize shot distance with Gaussian variation (realistic)
+            #mean_factor = 0.2 + (1 - 0.2) * (36 - min(player.hcp, 36)) / 36
             actual_distance = min(random.gauss(club_distance, dispersion), club_distance+10)
 
             # Ensure the ball doesn’t exceed the remaining distance
@@ -442,8 +449,8 @@ class GolfSimulator:
 
             if(new_area.get('Zone') is True):
                 valid = True
-                print('Invalid Zone')
-                print(Point(new_lon, new_lat))
+
+                print(f'The Zone is Invalid {Point(new_lon, new_lat)} \n New trajectory is being calculated.')
 
         # Print debugging info
         print(f"\nClub: {club}")
@@ -459,17 +466,25 @@ class GolfSimulator:
 
         return Point(new_lon, new_lat)
 
-    def simulateShot(self, player_id, coordinates):
-        self.player_id = player_id
-        hole = Hole(self.hole_data)
-        area = hole.return_location(self.latest_point)
-        score = 0
-        while area.get('Green') is False:
-            coordinates = self.calculate_shot_with_dispersion(player_id, self.latest_point)
-            score += 1
-            area = hole.return_location(coordinates)
-            print(f'Score: {score}\n')
+    def simulateShot(self, last_id):
+        for player_id in range(1, last_id+1):
+            print(f'--------------------[PLAYER : {player_id}]--------------------')
+            simulator = GolfSimulator(self.player_data, self.hole_data, self.starting_point, self.hole_id)
 
+            simulator.player_id = player_id
+            hole = Hole(simulator.hole_data)
+            area = hole.return_location(simulator.latest_point)
+            while area.get('Green') is False:
+                coordinates = simulator.calculate_shot_with_dispersion(simulator.player_id, simulator.latest_point)
+                simulator.score += 1
+                area = hole.return_location(coordinates)
+                if player_id != 1:
+                    simulator.csv_initialized = True
+            simulator.plotShot()
+            simulator.write_to_csv()
+            print()
+            print(f'--------------------[FINSHIED: {player_id}]--------------------')
+            print()
     def plotShot(self):
         m = folium.Map(location=[self.starting_point.x, self.starting_point.y], zoom_start=18)
         folium.TileLayer('Esri.WorldImagery').add_to(m)
@@ -509,29 +524,49 @@ class GolfSimulator:
 
         m.save(f'Dataset/Maps/{self.player_id}.html')
 
+    def write_to_csv(self):
+        fieldnames = ['player_id', 'hole_id','shot_id','start_coords', 'end_coords', 'club']
+
+        if self.csv_initialized is False:
+            with open('Dataset/Output.csv', 'w', newline='', encoding='utf-8') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+            self.csv_initialized = True
+
+        start_coords = (self.starting_point.x, self.starting_point.y)
+        score = []
+        for i in range(1,self.score+1):
+            score.append(i)
+
+        for position in self.positions:
+            index = self.positions.index(position)
+
+            data_entry = {'player_id': self.player_id,
+                          'hole_id': self.hole_id,
+                          'shot_id': score[index]
+                          }
+            end_coords = (position.x, position.y)
+            club = self.clubs[index]
+            data_entry['start_coords'] = start_coords
+            data_entry['end_coords'] = end_coords
+            data_entry['club'] = club
+            start_coords = end_coords
+
+            with open('Dataset/Output.csv', 'a', newline='', encoding='utf-8') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+                writer.writerow(data_entry)
+
+
 
 if __name__ == '__main__':
 
     player_data = pd.read_csv('player_data.csv')
     hole_data = pd.read_csv('Hole_1.csv')
-    #print(random.gauss(304, 18))
 
 
-    for i in range(1,501):
-        print(f'----------------------PLAYER [ {i} ] ----------------------')
-        simulator = GolfSimulator(player_data, hole_data, Point(51.60576426300037, -0.22007174187974488))
-        simulator.simulateShot(i, Point(51.60576426300037, -0.22007174187974488))
-        simulator.plotShot()
-        print()
+    simulator = GolfSimulator(player_data, hole_data, Point(51.60576426300037, -0.22007174187974488), 1)
+    simulator.simulateShot(500)
 
 
-    #simulator = GolfSimulator(player_data, hole_data, Point(51.60576426300037, -0.22007174187974488))
-    #simulator.simulateShot(100, Point(51.60576426300037, -0.22007174187974488))
-    #simulator.plotShot()
-
-
-
-    #simulator.calculate_shot_with_dispersion(5, Point(51.6036656607981, -0.2197817352561925))
-    #selected_club = simulator.club_selection(19, Point(51.60405860120144, -0.2195491439693001))
-    #print(f"Selected Club: {selected_club}")
 
