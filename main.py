@@ -5,11 +5,14 @@ import random
 import folium
 import numpy as np
 import pandas as pd
+from geopy.distance import geodesic
+from shapely import LineString
 from shapely.geometry import Point, Polygon
 from clubselector import ClubSelector
 from hole import Hole
 from player import Player
 from angle_dispersion import AngleDispersion
+from mid_point import MidPoint
 
 
 class GolfSimulator:
@@ -168,6 +171,29 @@ class GolfSimulator:
             print(f'--------------------[FINSHIED: {player_id}]--------------------')
             print()
 
+    def calculate_expected_area(self, hole_data, position):
+        hole = Hole(hole_data)
+        fairway = hole.polygons['Fairway'][0]
+        extend_distance = 0.001
+
+        left_point = geodesic(miles=0.2).destination((float(position.y), float(position.x)), 270)
+        right_point = geodesic(miles=0.2).destination((float(position.y), float(position.x)), 90)
+
+        lateral_line = LineString([(position.x - extend_distance, position.y), (position.x + extend_distance, position.y)])
+
+
+        intersection_points = fairway.exterior.intersection(lateral_line)
+
+        # Convert points to 13 decimal precision
+        points = list(intersection_points.geoms)
+        print(points)
+
+
+        for point in points:
+            print(f"Intersection at: ({point.x:.13f}, {point.y:.13f})")
+
+
+
     def shotRating(self):
         pass
 
@@ -253,7 +279,15 @@ if __name__ == '__main__':
 
 
     simulator = GolfSimulator(player_data, hole_data, Point(51.60576426300037, -0.22007174187974488), 1)
-    simulator.simulateShot(500)
+    #simulator.simulateShot(500)
+
+    simulator.calculate_expected_area(hole_data, Point(51.60406026403871, -0.2198488919749506))
+
+
+    hole = Hole(hole_data)
+    print(hole.polygons['Fairway'][0])
+    test = MidPoint.find_fairway_intersections(Point(51.603567730737126, -0.21886414640818094), hole.polygons['Fairway'][0])
+    print(test)
 
 
 
