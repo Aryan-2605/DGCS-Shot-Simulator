@@ -19,14 +19,21 @@ class Ratings:
         distance_expected_centroid = geodesic((expected_coords.y, expected_coords.x), (centroid.y, centroid.x))
         distance_actual_centroid = geodesic((coords.y, coords.x), (centroid.y, centroid.x))
 
-        #if distance_actual_centroid.ft < distance_expected.ft and area.get(''):
+        penalty = 1
 
+        if distance_actual_centroid.ft < distance_expected.ft:
 
+            if area.get('Fairway') and not area.get('Bunker'):
+                return 1
+            elif  area.get('Bunker'):
+                penalty = 0.4
+            elif area.get('TreeLine'):
+                penalty = 0.5
 
         distance_yards = distance_expected.ft * 0.333333
         print(distance_yards)
 
-        return max(0, 1 - (distance_yards / 75) ** 2)
+        return max(0, (1 - (distance_yards / 75) ** 2) / penalty)
 
 
 

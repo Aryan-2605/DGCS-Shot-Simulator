@@ -212,8 +212,9 @@ class GolfSimulator:
 
 
     def shotRating(self):
-
         shotRatings = []
+        dispersionRatings = []
+        areaRatings = []
         player = Player(self.player_id, self.player_data)
         hole = Hole(self.hole_data)
         centroid = hole.polygons['Green'][0].centroid
@@ -221,26 +222,17 @@ class GolfSimulator:
         for item in self.positions:
             index = self.positions.index(item)
             expected_area = self.expected_area[index]
+            area = hole.return_location(item)
             expected_distance = player.data.get(self.clubs[index], 0)
             real_distance = self.shot_distances[index]
 
-            print(Ratings.calculate_dispersion(real_distance, expected_distance))
-
-
-
-
-
-
-
-
-
-
-
+            areaRatings.append(Ratings.calculate_expected_area(item, expected_area, centroid, area))
+            dispersionRatings.append(Ratings.calculate_dispersion(real_distance, expected_distance))
+            #print(Ratings.calculate_dispersion(real_distance, expected_distance))
 
 
     def plotShot(self):
         print(f'Printing in plot shot: {self.expected_area}')
-        self.shotRating()
         m = folium.Map(location=[self.starting_point.x, self.starting_point.y], zoom_start=18)
         folium.TileLayer('Esri.WorldImagery').add_to(m)
         folium.LayerControl().add_to(m)
@@ -345,7 +337,7 @@ if __name__ == '__main__':
     #dispersion_score = Ratings.calculate_dispersion(130, 150)
     #print(dispersion_score)
 
-    #distance = Ratings.calculate_expected_area(Point(51.60350114052477, -0.2192771469886219), Point(51.60297470685016, -0.2193307911662193))
+    distance = Ratings.calculate_expected_area(Point(51.60350114052477, -0.2192771469886219), Point(51.60297470685016, -0.2193307911662193), hole.polygons['Green'][0].centroid)
     #print(distance)
 
 
