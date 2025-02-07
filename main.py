@@ -5,13 +5,14 @@ import random
 import folium
 import numpy as np
 import pandas as pd
-from geopy.distance import geodesic
+from geopy.distance import *
 from shapely import LineString
 from shapely.geometry import Point, Polygon
 from clubselector import ClubSelector
 from hole import Hole
 from player import Player
 from angle_dispersion import AngleDispersion
+from geopy.distance import great_circle
 from mid_point import MidPoint
 
 
@@ -171,31 +172,19 @@ class GolfSimulator:
             print(f'--------------------[FINSHIED: {player_id}]--------------------')
             print()
 
-    def calculate_expected_area(self, hole_data, position):
+    def calculate_expected_area(self, hole_data, position, club_distance):
+        position = (position.x, position.y)
         hole = Hole(hole_data)
-        fairway = hole.polygons['Fairway'][0]
-        extend_distance = 0.001
-
-        left_point = geodesic(miles=0.2).destination((float(position.y), float(position.x)), 270)
-        right_point = geodesic(miles=0.2).destination((float(position.y), float(position.x)), 90)
-
-        lateral_line = LineString([(position.x - extend_distance, position.y), (position.x + extend_distance, position.y)])
-
-
-        intersection_points = fairway.exterior.intersection(lateral_line)
-
-        # Convert points to 13 decimal precision
-        points = list(intersection_points.geoms)
-        print(points)
-
-
-        for point in points:
-            print(f"Intersection at: ({point.x:.13f}, {point.y:.13f})")
+        centroid = (hole.polygons['Green'][0].centroid.x, hole.polygons['Green'][0].centroid.y)
+        bearing = geodesic(position, centroid).bearing
+        club_distance = club_distance * 0.000568182 #Convert yards to miles
+        end_coords = geodesic(miles=club_distance).destination(position, bearing)
+        print(end_coords)
 
 
 
     def shotRating(self):
-        pass
+            pass
 
 
     def plotShot(self):
@@ -281,13 +270,12 @@ if __name__ == '__main__':
     simulator = GolfSimulator(player_data, hole_data, Point(51.60576426300037, -0.22007174187974488), 1)
     #simulator.simulateShot(500)
 
-    simulator.calculate_expected_area(hole_data, Point(51.60406026403871, -0.2198488919749506))
-
+    simulator.calculate_expected_area(hole_data, Point(51.60429042451056, -0.21953954948729984), 97)
 
     hole = Hole(hole_data)
-    print(hole.polygons['Fairway'][0])
-    test = MidPoint.find_fairway_intersections(Point(51.603567730737126, -0.21886414640818094), hole.polygons['Fairway'][0])
-    print(test)
+    #print(hole.polygons['Fairway'][0])
+    #test = MidPoint.find_fairway_intersections(Point(51.603567730737126, -0.21886414640818094), hole.polygons['Fairway'][0])
+    #print(test)
 
 
 
