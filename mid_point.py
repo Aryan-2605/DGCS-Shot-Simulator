@@ -1,5 +1,7 @@
+from geopy.distance import geodesic
 from shapely.geometry import Point, LineString, Polygon
 import numpy as np
+import math
 
 
 class MidPoint:
@@ -71,5 +73,34 @@ class MidPoint:
         RHS = round((points[0].y + points[1].y) / 2, 13)
 
         return Point(LHS, RHS)
+
+    @staticmethod
+    def calculate_bearing(position, centroid):
+        """
+        Calculate the bearing of a point.
+        :param position: lon, lat of player position
+        :param centroid: lon, lat of green centroid
+        :return: bearing angle in radians
+        :var: x = tan^-1 (sin(longitude difference) * cos(latitude centroid)) /
+        ((cos(player latitude) * sin(centroid latitude))
+        - (sin(player latitude) * cos(centroid latitude) * cos(lontitude difference)))
+
+        :var: bearing = (x(180/pi) + 360) % 360
+        """
+
+        lat1, lon1 = math.radians(position.y), math.radians(position.x)
+        lat2, lon2 = math.radians(centroid.y), math.radians(centroid.x)
+
+        delta_lon = lon2 - lon1
+        x = math.sin(delta_lon) * math.cos(lat2)
+        y = (math.cos(lat1) * math.sin(lat2)) - (math.sin(lat1) * math.cos(lat2) * math.cos(delta_lon))
+
+        initial_bearing = math.atan2(x, y)
+
+        bearing = (math.degrees(initial_bearing) + 360) % 360
+
+        return bearing
+
+
 
 

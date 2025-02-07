@@ -14,7 +14,7 @@ from player import Player
 from angle_dispersion import AngleDispersion
 from geopy.distance import great_circle
 from mid_point import MidPoint
-
+from ratings import Ratings
 
 class GolfSimulator:
     def __init__(self, player_data, hole_data, starting_point, hole_id):
@@ -28,6 +28,8 @@ class GolfSimulator:
         self.hole_id = hole_id
         self.score = 0
         self.csv_initialized = False
+        self.expected_area = []
+        self.shot_distances = []
 
     def club_selection(self, player_id, coordinates):
         hole = Hole(self.hole_data)
@@ -67,12 +69,20 @@ class GolfSimulator:
         club = self.club_selection(player_id, coordinates)
         player = Player(player_id, self.player_data)
 
-        # Fetch club distance and dispersion from player data
-        club_distance = player.data.get(club, 0)
-        dispersion = player.data.get(f'{club}_Dispersion', 0)
-
         hole = Hole(self.hole_data)
         area = hole.return_location(coordinates)
+
+        # Fetch club distance and dispersion from player data
+        club_distance = player.data.get(club, 0)
+        self.expected_area.append(self.calculate_expected_area(self.latest_point, club_distance))
+
+
+
+        for item in self.expected_area:
+            print(f'Expected area: {item}')
+        dispersion = player.data.get(f'{club}_Dispersion', 0)
+
+
         green_distances = hole.calculate_green_distances(coordinates, hole.polygons['Green'][0])
 
         if club_distance > green_distances['Centre'][0]:
@@ -145,6 +155,7 @@ class GolfSimulator:
         print(f"Green Centre: {green_centre}")
         print(f"Dispersion: {dispersion}")
         print(f"Shot Distance (yards): {actual_distance}")
+        self.shot_distances.append(actual_distance)
         print(f"Angle Dispersion (degrees): {angle_dispersion}")
         print(f"New Position: {Point(new_lon, new_lat)}\n")
         self.latest_point = Point(new_lon, new_lat)
@@ -155,6 +166,7 @@ class GolfSimulator:
     def simulateShot(self, last_id):
         for player_id in range(1, last_id+1):
             print(f'--------------------[PLAYER : {player_id}]--------------------')
+            print('Itteration happens')
             simulator = GolfSimulator(self.player_data, self.hole_data, self.starting_point, self.hole_id)
 
             simulator.player_id = player_id
@@ -172,22 +184,63 @@ class GolfSimulator:
             print(f'--------------------[FINSHIED: {player_id}]--------------------')
             print()
 
-    def calculate_expected_area(self, hole_data, position, club_distance):
-        position = (position.x, position.y)
-        hole = Hole(hole_data)
-        centroid = (hole.polygons['Green'][0].centroid.x, hole.polygons['Green'][0].centroid.y)
-        bearing = geodesic(position, centroid).bearing
-        club_distance = club_distance * 0.000568182 #Convert yards to miles
-        end_coords = geodesic(miles=club_distance).destination(position, bearing)
-        print(end_coords)
+
+    def calculate_expected_area(self, position, club_distance):
+        hole = Hole(self.hole_data)
+        area = hole.return_location(position)
+        green_distances = hole.calculate_green_distances(position, hole.polygons['Green'][0])
+        centroid = hole.polygons['Green'][0].centroid
+        bearing = MidPoint.calculate_bearing(position, centroid)
+
+        print(f'Player Position {position} \n Green Centroid: {centroid}')
+        print(f'Angle towards the centroid: {bearing}')
+
+        if club_distance > green_distances['Centre'][0]:
+            print('Centroid is the most suitable expected area.')
+            return centroid
+
+        club_distance = club_distance * 0.000568182 #Convert distance to miles
+
+        end_coords = geodesic(miles=club_distance).destination((position.y, position.x), bearing)
+        expected_area = Point(end_coords.longitude, end_coords.latitude)
+        print(f'Expected area: {expected_area}')
+        fairway_MP = MidPoint.find_fairway_intersections(expected_area, hole.polygons['Fairway'][0])
+        print(f'Fairway intersections: {fairway_MP}')
+
+        return fairway_MP
 
 
 
     def shotRating(self):
-            pass
+
+        shotRatings = []
+        player = Player(self.player_id, self.player_data)
+        hole = Hole(self.hole_data)
+        centroid = hole.polygons['Green'][0].centroid
+
+        for item in self.positions:
+            index = self.positions.index(item)
+            expected_area = self.expected_area[index]
+            expected_distance = player.data.get(self.clubs[index], 0)
+            real_distance = self.shot_distances[index]
+
+            print(Ratings.calculate_dispersion(real_distance, expected_distance))
+
+
+
+
+
+
+
+
+
+
+
 
 
     def plotShot(self):
+        print(f'Printing in plot shot: {self.expected_area}')
+        self.shotRating()
         m = folium.Map(location=[self.starting_point.x, self.starting_point.y], zoom_start=18)
         folium.TileLayer('Esri.WorldImagery').add_to(m)
         folium.LayerControl().add_to(m)
@@ -227,6 +280,9 @@ class GolfSimulator:
         m.save(f'Dataset/Maps/{self.player_id}.html')
 
     def write_to_csv(self):
+
+        self.shotRating()
+
         fieldnames = ['player_id', 'hole_id','shot_id','start_coords', 'end_coords', 'club']
 
         if self.csv_initialized is False:
@@ -268,14 +324,30 @@ if __name__ == '__main__':
 
 
     simulator = GolfSimulator(player_data, hole_data, Point(51.60576426300037, -0.22007174187974488), 1)
-    #simulator.simulateShot(500)
+    simulator.simulateShot(1)
+    #print(simulator.expected_area)
 
-    simulator.calculate_expected_area(hole_data, Point(51.60429042451056, -0.21953954948729984), 97)
+
 
     hole = Hole(hole_data)
+    #simulator.calculate_expected_area(Point(51.60427449727718, -0.21965515431456822), 97)
+    #print(simulator.expected_area)
     #print(hole.polygons['Fairway'][0])
     #test = MidPoint.find_fairway_intersections(Point(51.603567730737126, -0.21886414640818094), hole.polygons['Fairway'][0])
     #print(test)
+
+   # bearing = MidPoint.calculate_bearing(Point(51.60431819609354, -0.22023722309929555),
+   #                                      Point(51.60301799505365, -0.21922544942785488))
+
+
+    #print(bearing)
+
+    #dispersion_score = Ratings.calculate_dispersion(130, 150)
+    #print(dispersion_score)
+
+    #distance = Ratings.calculate_expected_area(Point(51.60350114052477, -0.2192771469886219), Point(51.60297470685016, -0.2193307911662193))
+    #print(distance)
+
 
 
 
