@@ -53,7 +53,8 @@ class MidPoint:
         # Return intersection points
         if intersection.is_empty:
             print("Error can't find intersection")
-            return []
+
+            return 1
         elif intersection.geom_type == "Point":
             print('Error: Line is not long enough')
             return [intersection]
@@ -61,7 +62,7 @@ class MidPoint:
             points = list(intersection.geoms)
             intersections = []
             for point in points:
-                print(f"Intersection at: ({point.x:.13f}, {point.y:.13f})")
+                #print(f"Intersection at: ({point.x:.13f}, {point.y:.13f})")
                 intersections.append(Point(f'{point.x:.13f}', f'{point.y:.13f}'))
 
             return MidPoint.mid_point_calc(intersections)

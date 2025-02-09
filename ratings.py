@@ -10,30 +10,32 @@ class Ratings:
             return 1
         else:
             penalty = ((expected_distance - actual_distance) / expected_distance)
-            print('Works')
+            #print('Works')
             return max(0, 1 - penalty)
 
     @staticmethod
     def calculate_expected_area(coords, expected_coords, centroid, area):
+        #print(f' Coords {coords}')
+        #print(expected_coords)
+        #print(area)
         distance_expected = geodesic((coords.y, coords.x), (expected_coords.y, expected_coords.x))
         distance_expected_centroid = geodesic((expected_coords.y, expected_coords.x), (centroid.y, centroid.x))
         distance_actual_centroid = geodesic((coords.y, coords.x), (centroid.y, centroid.x))
 
         penalty = 1
 
-        if distance_actual_centroid.ft < distance_expected.ft:
-
-            if area.get('Fairway') and not area.get('Bunker'):
-                return 1
-            elif  area.get('Bunker'):
-                penalty = 0.4
-            elif area.get('TreeLine'):
-                penalty = 0.5
+        if area.get('Fairway') and not area.get('Bunker'):
+            penalty = 1
+        elif area.get('Bunker'):
+            penalty = 0.4
+        elif area.get('TreeLine'):
+            penalty = 0.5
+        elif area.get('Zone'):
+            penalty = 0.6
 
         distance_yards = distance_expected.ft * 0.333333
-        print(distance_yards)
 
-        return max(0, (1 - (distance_yards / 75) ** 2) / penalty)
+        return max(0, (1 - (distance_yards / 75) ** 2) * penalty)
 
 
 
