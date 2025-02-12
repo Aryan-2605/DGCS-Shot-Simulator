@@ -12,6 +12,7 @@ from player import Player
 from angle_dispersion import AngleDispersion
 from mid_point import MidPoint
 from ratings import Ratings
+import time
 
 class GolfSimulator:
     def __init__(self, player_data, hole_data, starting_point, hole_id):
@@ -29,6 +30,8 @@ class GolfSimulator:
         self.shot_distances = []
         self.expected_distance = []
         self.rating = []
+        self.bearing = []
+        self.round_id = None
 
     def club_selection(self, player_id, coordinates):
         hole = Hole(self.hole_data)
@@ -77,8 +80,7 @@ class GolfSimulator:
 
 
 
-        for item in self.expected_area:
-            print(f'Expected area: {item}')
+
         dispersion = player.data.get(f'{club}_Dispersion', 0)
 
 
@@ -166,30 +168,51 @@ class GolfSimulator:
 
         return Point(new_lon, new_lat)
 
-    def simulateShot(self, last_id, itterate = True):
+    def simulateShot(self, last_id, itterate=True):
         start = 1
-        if itterate == False:
+        if not itterate:
             start = last_id
+        round_id = 0
+        all_shots = []
 
-        for player_id in range(start, last_id+1):
+        max_time_per_iteration =  20
+
+        for player_id in range(start, last_id + 1):
             print(f'--------------------[PLAYER : {player_id}]--------------------')
-            print('Itteration happens')
-            simulator = GolfSimulator(self.player_data, self.hole_data, self.starting_point, self.hole_id)
+            rounds_to_play = random.randint(1, 6)
 
-            simulator.player_id = player_id
-            hole = Hole(simulator.hole_data)
-            area = hole.return_location(simulator.latest_point)
-            while area.get('Green') is False:
-                coordinates = simulator.calculate_shot_with_dispersion(simulator.player_id, simulator.latest_point)
-                simulator.score += 1
-                area = hole.return_location(coordinates)
-                if player_id != 1:
-                    simulator.csv_initialized = True
-            simulator.plotShot()
-            simulator.write_to_csv()
-            print()
-            print(f'--------------------[FINSHIED: {player_id}]--------------------')
-            print()
+            for _ in range(rounds_to_play):
+                start_time = time.time()
+                print(f'Playing round {_ + 1} for player {player_id}')
+                simulator = GolfSimulator(self.player_data, self.hole_data, self.starting_point, self.hole_id)
+                simulator.player_id = player_id
+                simulator.round_id = round_id + 1
+                round_id += 1
+
+                hole = Hole(simulator.hole_data)
+                area = hole.return_location(simulator.latest_point)
+
+                while area.get('Green') is False:
+                    if time.time() - start_time > max_time_per_iteration:
+                        print(f"Skipping round {_ + 1} for player {player_id} due to time limit.")
+                        break  # Break out of the loop and move to the next round
+                    coordinates = simulator.calculate_shot_with_dispersion(simulator.player_id, simulator.latest_point)
+                    simulator.score += 1
+                    area = hole.return_location(coordinates)
+                    if player_id != 1:
+                        simulator.csv_initialized = True
+
+                simulator.plotShot()
+                all_shots.extend(simulator.prepare_csv_data(round_id))
+
+                print(f'--------------------[FINISHED ROUND {_ + 1} for PLAYER: {player_id}]--------------------')
+
+            print(f'--------------------[FINISHED PLAYER: {player_id}]--------------------')
+
+        self.write_to_csv(all_shots)
+
+
+
 
 
     def calculate_expected_area(self, position, club_distance):
@@ -201,6 +224,9 @@ class GolfSimulator:
 
         print(f'Player Position {position} \n Green Centroid: {centroid}')
         print(f'Angle towards the centroid: {bearing}')
+        self.bearing.append(bearing)
+
+
 
         if club_distance > green_distances['Centre'][0]:
             print('Centroid is the most suitable expected area.')
@@ -210,7 +236,7 @@ class GolfSimulator:
 
         end_coords = geodesic(miles=club_distance).destination((position.y, position.x), bearing)
         expected_area = Point(end_coords.longitude, end_coords.latitude)
-       # print(f'Expected area: {expected_area}')
+        print(f'Expected area: {expected_area}')
 
 
         fairway_MP = MidPoint.find_fairway_intersections(expected_area, hole.polygons['Fairway'][0])
@@ -220,6 +246,7 @@ class GolfSimulator:
         if fairway_MP == 1:
             expected_area = Point(float(end_coords.longitude), float(end_coords.latitude))
             return expected_area
+
 
         return fairway_MP
 
@@ -302,43 +329,42 @@ class GolfSimulator:
 
             m.save(f'Dataset/Maps/{self.player_id}.html')
 
-    def write_to_csv(self):
 
+    def prepare_csv_data(self, round_id):
         self.shotRating()
 
-        fieldnames = ['player_id', 'hole_id','shot_id','start_coords', 'end_coords', 'club', 'rating']
-
-        if self.csv_initialized is False:
-            with open('Dataset/Output.csv', 'w', newline='', encoding='utf-8') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                writer.writeheader()
-            self.csv_initialized = True
-
         start_coords = (self.starting_point.x, self.starting_point.y)
-        score = []
-        for i in range(1,self.score+1):
-            score.append(i)
+        score = list(range(1, self.score + 1))
+        data_entries = []
 
-        for position in self.positions:
-            index = self.positions.index(position)
-
-            data_entry = {'player_id': self.player_id,
-                          'hole_id': self.hole_id,
-                          'shot_id': score[index],
-                          'rating':  self.rating[index]
-                          }
+        for index, position in enumerate(self.positions):
             end_coords = (position.x, position.y)
             club = self.clubs[index]
-            data_entry['start_coords'] = start_coords
-            data_entry['end_coords'] = end_coords
-            data_entry['club'] = club
+
+            data_entry = {
+                'round_id': round_id,
+                'player_id': self.player_id,
+                'hole_id': self.hole_id,
+                'shot_id': score[index],
+                'rating': self.rating[index],
+                'bearing': self.bearing[index],
+                'start_coords': start_coords,
+                'end_coords': end_coords,
+                'club': club
+            }
+
+            data_entries.append(data_entry)
             start_coords = end_coords
 
-            with open('Dataset/Output.csv', 'a', newline='', encoding='utf-8') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        return data_entries
 
-                writer.writerow(data_entry)
+    def write_to_csv(self, all_shots):
+        fieldnames = ['round_id','player_id', 'hole_id', 'shot_id', 'start_coords', 'end_coords', 'club', 'bearing', 'rating']
 
+        with open('Dataset/Output.csv', 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(all_shots)
 
 
 if __name__ == '__main__':
@@ -353,7 +379,7 @@ if __name__ == '__main__':
 
 
 
-    hole = Hole(hole_data)
+    #hole = Hole(hole_data)
     #simulator.calculate_expected_area(Point(51.60427449727718, -0.21965515431456822), 97)
     #print(simulator.expected_area)
     #print(hole.polygons['Fairway'][0])

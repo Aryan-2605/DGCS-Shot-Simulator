@@ -66,6 +66,7 @@ class MidPoint:
                 intersections.append(Point(f'{point.x:.13f}', f'{point.y:.13f}'))
 
             return MidPoint.mid_point_calc(intersections)
+        print('Error mid_point.py line 69')
 
     @staticmethod
     def mid_point_calc(points):
@@ -99,9 +100,41 @@ class MidPoint:
         initial_bearing = math.atan2(x, y)
 
         bearing = (math.degrees(initial_bearing) + 360) % 360
-
+        print(bearing)
         return bearing
 
 
+MidPoint.calculate_bearing(
+    Point(51.60576426300037, -0.22007174187974488), Point(51.60416249319069, -0.21958896007660328))
 
+print()
+
+
+def calculate_absolute_bearing_degrees_between_objects(latitude1_degrees, longitude1_degrees, latitude2_degrees,
+                                                       longitude2_degrees):
+    # Convert decimal degrees to radians
+    latitude1_radians, longitude1_radians, latitude2_radians, longitude2_radians = map(math.radians, [latitude1_degrees,
+                                                                                                      longitude1_degrees,
+                                                                                                      latitude2_degrees,
+                                                                                                      longitude2_degrees])
+
+    dLongitude = longitude2_radians - longitude1_radians
+
+    x = math.sin(dLongitude) * math.cos(latitude2_radians)
+    y = math.cos(latitude1_radians) * math.sin(latitude2_radians) - \
+        math.sin(latitude1_radians) * math.cos(latitude2_radians) * math.cos(dLongitude)
+
+    bearing_radians = math.atan2(x, y)
+    bearing_degrees = math.degrees(bearing_radians)
+
+    # Normalize to [0, 360) degrees
+    bearing_degrees = (bearing_degrees + 360) % 360
+
+    print(bearing_degrees)
+
+    return bearing_degrees
+
+
+calculate_absolute_bearing_degrees_between_objects(51.60576426300037, -0.22007174187974488, 51.60416249319069,
+                                                   -0.21958896007660328)
 
