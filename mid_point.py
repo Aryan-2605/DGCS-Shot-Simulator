@@ -30,14 +30,13 @@ class MidPoint:
         :return: List of intersection points
         """
         x, y = player_position.x, player_position.y  # long and lat,
-
         # Get fairway orientation
         fairway_angle = MidPoint.get_fairway_orientation(fairway_polygon)
 
-        # Calculate perpendicular direction (fairway_angle ± 90°)
+    # Calculate perpendicular direction (fairway_angle ± 90°)
         perp_angle_rad = np.radians(fairway_angle + 90)  # Convert to radians
 
-        # extends the line left and right
+    # extends the line left and right
         left_x = x + extend_distance * np.cos(perp_angle_rad)
         left_y = y + extend_distance * np.sin(perp_angle_rad)
 
@@ -100,14 +99,12 @@ class MidPoint:
         initial_bearing = math.atan2(x, y)
 
         bearing = (math.degrees(initial_bearing) + 360) % 360
-        print(bearing)
         return bearing
 
 
 MidPoint.calculate_bearing(
     Point(51.60576426300037, -0.22007174187974488), Point(51.60416249319069, -0.21958896007660328))
 
-print()
 
 
 def calculate_absolute_bearing_degrees_between_objects(latitude1_degrees, longitude1_degrees, latitude2_degrees,
@@ -129,8 +126,6 @@ def calculate_absolute_bearing_degrees_between_objects(latitude1_degrees, longit
 
     # Normalize to [0, 360) degrees
     bearing_degrees = (bearing_degrees + 360) % 360
-
-    print(bearing_degrees)
 
     return bearing_degrees
 

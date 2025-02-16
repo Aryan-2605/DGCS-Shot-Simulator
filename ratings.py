@@ -10,7 +10,7 @@ class Ratings:
             return 1
         else:
             penalty = ((expected_distance - actual_distance) / expected_distance)
-            #print('Works')
+            print('Works')
             return max(0, 1 - penalty)
 
     @staticmethod
